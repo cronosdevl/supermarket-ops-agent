@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { config } from "../util/config.js";
-import { storeServer, STORE_TOOL_NAMES } from "../tools/store-server.js";
+import { buildStoreServer } from "../tools/store-server.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
 
 /**
@@ -26,13 +26,16 @@ export async function respondToMessage(chatId: number, text: string): Promise<st
   const resume = sessions.get(chatId);
   let reply = "";
 
+  // Build the tool surface bound to this chat (billing acts on this chat's draft).
+  const { server, toolNames } = buildStoreServer({ chatId });
+
   for await (const message of query({
     prompt: text,
     options: {
       model: config.model,
       systemPrompt: SYSTEM_PROMPT,
-      mcpServers: { store: storeServer },
-      allowedTools: STORE_TOOL_NAMES,
+      mcpServers: { store: server },
+      allowedTools: toolNames,
       permissionMode: "dontAsk",
       settingSources: [], // don't load host ~/.claude or project settings/skills
       cwd: config.projectRoot,

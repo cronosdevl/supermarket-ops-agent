@@ -1,5 +1,7 @@
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { inventoryTools } from "./inventory.js";
+import { billingTools } from "./billing.js";
+import type { ToolContext } from "./context.js";
 
 /**
  * The store's in-process tool surface. Every capability the owner can invoke is
@@ -7,17 +9,19 @@ import { inventoryTools } from "./inventory.js";
  * oversell guard, GST, idempotency, khata) live inside the tool/repo layer —
  * never in the prompt.
  *
- * Tools are grouped by skill/domain module and composed here. Add new modules'
- * tool arrays to `allTools` as later phases land (billing, khata, analytics,
- * documents, memory).
+ * Built PER CONVERSATION so chat-scoped tools (billing) close over the Telegram
+ * chat id rather than trusting the model to supply it. Construction is cheap;
+ * we rebuild it each turn.
  */
-const allTools = [...inventoryTools];
+export function buildStoreServer(ctx: ToolContext) {
+  const allTools = [...inventoryTools(), ...billingTools(ctx)];
 
-export const storeServer = createSdkMcpServer({
-  name: "store",
-  version: "0.1.0",
-  tools: allTools,
-});
+  const server = createSdkMcpServer({
+    name: "store",
+    version: "0.1.0",
+    tools: allTools,
+  });
 
-/** Fully-qualified tool names to allow-list in query() options. */
-export const STORE_TOOL_NAMES = allTools.map((t) => `mcp__store__${t.name}`);
+  const toolNames = allTools.map((t) => `mcp__store__${t.name}`);
+  return { server, toolNames };
+}

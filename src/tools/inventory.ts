@@ -168,4 +168,7 @@ const listLowStockTool = tool(
     }),
 );
 
-export const inventoryTools = [getStock, addProduct, receiveStockTool, listLowStockTool];
+/** Inventory tools are store-global (no per-chat context needed). */
+export function inventoryTools() {
+  return [getStock, addProduct, receiveStockTool, listLowStockTool];
+}
