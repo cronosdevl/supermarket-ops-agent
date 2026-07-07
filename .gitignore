@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.log
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# SQLite database + WAL/SHM sidecars
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-*
+
+# Generated artifacts (invoices, decks)
+artifacts/
+
+# Claude Agent SDK session store (created at runtime)
+.claude-sessions/
+
+# OS
+.DS_Store
+Thumbs.db
