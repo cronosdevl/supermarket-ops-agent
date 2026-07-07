@@ -13,6 +13,7 @@ import {
   type Bill,
   type BillItem,
 } from "../db/bills.js";
+import { StoreError } from "../util/errors.js";
 import { guard, text } from "./_shared.js";
 import type { ToolContext } from "./context.js";
 
@@ -57,9 +58,13 @@ function formatBill(bill: Bill, items: BillItem[]): string {
   lines.push(`Total payable: ${formatINR(t.total)}`);
 
   if (!isDraft) {
-    const pay =
-      bill.payment_mode?.toUpperCase() + (bill.payment_ref ? ` (ref ${bill.payment_ref})` : "");
-    lines.push(`Paid by: ${pay}`);
+    if (bill.on_credit) {
+      lines.push(`On credit (khata): ${bill.customer_name}`);
+    } else {
+      const pay =
+        bill.payment_mode?.toUpperCase() + (bill.payment_ref ? ` (ref ${bill.payment_ref})` : "");
+      lines.push(`Paid by: ${pay}`);
+    }
   }
   return lines.join("\n");
 }
@@ -140,19 +145,38 @@ export function billingTools(ctx: ToolContext) {
   const finalizeBill = tool(
     "finalize_bill",
     "Finalize the current draft: check stock (refuses if any item would oversell), " +
-      "decrement stock atomically, compute the GST-correct totals, and record the " +
-      "payment. Requires a payment mode. After this the bill is locked.",
+      "decrement stock atomically, compute the GST-correct totals, and settle it. " +
+      "Settle EITHER by immediate payment (set payment_mode) OR on credit (set " +
+      "credit_customer to put the total on that customer's khata) — not both. After " +
+      "this the bill is locked.",
     {
-      payment_mode: z.enum(["cash", "upi", "card"]).describe("How the customer paid"),
-      payment_ref: z.string().optional().describe("Optional payment reference (UPI txn id, card last-4, etc.)"),
+      payment_mode: z
+        .enum(["cash", "upi", "card"])
+        .optional()
+        .describe("How the customer paid now. Omit if putting the bill on khata."),
+      payment_ref: z
+        .string()
+        .optional()
+        .describe("Optional payment reference (UPI txn id, card last-4, etc.)"),
+      credit_customer: z
+        .string()
+        .optional()
+        .describe("Customer name if this is a credit (khata) sale — the total is added to their khata instead of taking payment. Opens a khata if they're new."),
     },
     async (a) =>
       guard(() => {
-        const { bill, items } = finalizeDraft({
-          chatId: ctx.chatId,
-          payment_mode: a.payment_mode,
-          payment_ref: a.payment_ref,
-        });
+        if (a.payment_mode && a.credit_customer) {
+          throw new StoreError("Take payment OR put it on khata — not both.");
+        }
+        const settlement = a.credit_customer
+          ? ({ type: "credit", customer: a.credit_customer } as const)
+          : a.payment_mode
+            ? ({ type: "paid", mode: a.payment_mode, ref: a.payment_ref } as const)
+            : null;
+        if (!settlement) {
+          throw new StoreError("How is it settled — cash, UPI, card, or on someone's khata?");
+        }
+        const { bill, items } = finalizeDraft({ chatId: ctx.chatId, settlement });
         return text(`✅ Bill finalized.\n\n${formatBill(bill, items)}`);
       }),
   );

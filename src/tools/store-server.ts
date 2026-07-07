@@ -1,6 +1,7 @@
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { inventoryTools } from "./inventory.js";
 import { billingTools } from "./billing.js";
+import { khataTools } from "./khata.js";
 import type { ToolContext } from "./context.js";
 
 /**
@@ -14,7 +15,7 @@ import type { ToolContext } from "./context.js";
  * we rebuild it each turn.
  */
 export function buildStoreServer(ctx: ToolContext) {
-  const allTools = [...inventoryTools(), ...billingTools(ctx)];
+  const allTools = [...inventoryTools(), ...billingTools(ctx), ...khataTools()];
 
   const server = createSdkMcpServer({
     name: "store",

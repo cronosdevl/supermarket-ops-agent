@@ -2,6 +2,7 @@ import { db } from "./index.js";
 import { StoreError } from "../util/errors.js";
 import { computeLineGst } from "../domain/gst.js";
 import { getProductBySku, resolveProduct } from "./products.js";
+import { chargeRaw } from "./khata.js";
 
 export interface Bill {
   id: number;
@@ -189,10 +190,14 @@ export const cancelDraft = db.transaction((chatId: number): { id: number } => {
 
 // ---- finalize --------------------------------------------------------------
 
+/** How a finalized bill is settled: paid now (cash/upi/card) or put on khata. */
+export type Settlement =
+  | { type: "paid"; mode: PaymentMode; ref?: string }
+  | { type: "credit"; customer: string };
+
 export interface FinalizeInput {
   chatId: number;
-  payment_mode: PaymentMode;
-  payment_ref?: string;
+  settlement: Settlement;
 }
 
 /**
@@ -200,10 +205,13 @@ export interface FinalizeInput {
  *  - refuse below-cost lines (guardrail),
  *  - oversell guard + atomic stock decrement per line (any shortfall rolls the
  *    whole thing back — no partial decrements),
- *  - compute & persist GST breakup, flip status draft→final.
+ *  - compute & persist GST breakup,
+ *  - settle: record payment, OR add the total to the customer's khata (opening
+ *    the account if new) as a charge linked to this bill,
+ *  - flip status draft→final.
  *
  * Idempotency (§5): finalize consumes the draft (draft→final). A retried
- * finalize finds no open draft, so stock can never be decremented twice.
+ * finalize finds no open draft, so stock/khata can never be applied twice.
  */
 export const finalizeDraft = db.transaction((input: FinalizeInput): BillWithItems => {
   const draft = getOpenDraft(input.chatId);
@@ -237,17 +245,36 @@ export const finalizeDraft = db.transaction((input: FinalizeInput): BillWithItem
     total += g.gross;
   }
 
-  finalizeBillStmt.run({
-    id: draft.id,
-    payment_mode: input.payment_mode,
-    payment_ref: input.payment_ref ?? null,
-    customer_name: null,
-    on_credit: 0,
-    subtotal,
-    cgst,
-    sgst,
-    total,
-  });
+  if (input.settlement.type === "credit") {
+    // Opens the khata if the customer is new; charge is linked to this bill.
+    const { customer } = chargeRaw(input.settlement.customer, total, {
+      note: `Bill #${draft.id}`,
+      billId: draft.id,
+    });
+    finalizeBillStmt.run({
+      id: draft.id,
+      payment_mode: null,
+      payment_ref: null,
+      customer_name: customer.name,
+      on_credit: 1,
+      subtotal,
+      cgst,
+      sgst,
+      total,
+    });
+  } else {
+    finalizeBillStmt.run({
+      id: draft.id,
+      payment_mode: input.settlement.mode,
+      payment_ref: input.settlement.ref ?? null,
+      customer_name: null,
+      on_credit: 0,
+      subtotal,
+      cgst,
+      sgst,
+      total,
+    });
+  }
 
   return getBillWithItems(draft.id)!;
 });
