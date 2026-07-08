@@ -82,6 +82,12 @@ export function getOpenDraft(chatId: number): Bill | undefined {
 export function getBillById(id: number): Bill | undefined {
   return billByIdStmt.get(id) as Bill | undefined;
 }
+const latestFinalStmt = db.prepare(
+  "SELECT * FROM bills WHERE status = 'final' ORDER BY finalized_at DESC, id DESC LIMIT 1",
+);
+export function getLatestFinalBill(): Bill | undefined {
+  return latestFinalStmt.get() as Bill | undefined;
+}
 export function getBillItems(billId: number): BillItem[] {
   return itemsByBillStmt.all(billId) as BillItem[];
 }

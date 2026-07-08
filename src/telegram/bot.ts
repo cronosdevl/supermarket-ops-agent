@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, InputFile } from "grammy";
 import { config } from "../util/config.js";
 import { db } from "../db/index.js";
 import { respondToMessage, resetSession } from "../agent/respond.js";
@@ -48,8 +48,12 @@ export function createBot(): Bot {
 
     await ctx.replyWithChatAction("typing").catch(() => {});
     try {
-      const reply = await respondToMessage(chatId, text);
-      await ctx.reply(reply);
+      const { text: reply, files } = await respondToMessage(chatId, text);
+      if (reply) await ctx.reply(reply);
+      // Send any generated artifacts (PDF invoice, PPTX deck) as documents.
+      for (const f of files) {
+        await ctx.replyWithDocument(new InputFile(f.path, f.filename), f.caption ? { caption: f.caption } : {});
+      }
     } catch (err) {
       console.error("respondToMessage failed:", err);
       await ctx.reply("⚠️ Something went wrong handling that. Please try again.");

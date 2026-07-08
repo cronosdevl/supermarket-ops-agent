@@ -1,7 +1,14 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { config } from "../util/config.js";
 import { buildStoreServer } from "../tools/store-server.js";
+import type { OutgoingFile } from "../tools/context.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
+
+/** What the agent produces for one turn: a text reply plus any generated files. */
+export interface AgentReply {
+  text: string;
+  files: OutgoingFile[];
+}
 
 /**
  * The agent brain. One `query()` per user turn, resumed by session id so the
@@ -22,12 +29,14 @@ export function resetSession(chatId: number): void {
   sessions.delete(chatId);
 }
 
-export async function respondToMessage(chatId: number, text: string): Promise<string> {
+export async function respondToMessage(chatId: number, text: string): Promise<AgentReply> {
   const resume = sessions.get(chatId);
   let reply = "";
 
-  // Build the tool surface bound to this chat (billing acts on this chat's draft).
-  const { server, toolNames } = buildStoreServer({ chatId });
+  // Build the tool surface bound to this chat. `attachments` is the per-turn
+  // outbox that document tools push generated files into.
+  const attachments: OutgoingFile[] = [];
+  const { server, toolNames } = buildStoreServer({ chatId, attachments });
 
   for await (const message of query({
     prompt: text,
@@ -53,5 +62,5 @@ export async function respondToMessage(chatId: number, text: string): Promise<st
     }
   }
 
-  return reply || "…";
+  return { text: reply || "…", files: attachments };
 }
