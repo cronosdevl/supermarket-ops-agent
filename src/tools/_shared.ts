@@ -11,9 +11,7 @@ export function text(body: string): CallToolResult {
  * message the agent relays to the owner, and unexpected errors into a safe
  * generic result. Keeps every tool handler small and consistent.
  */
-export async function guard(
-  fn: () => CallToolResult | Promise<CallToolResult>,
-): Promise<CallToolResult> {
+export async function guard(fn: () => CallToolResult | Promise<CallToolResult>): Promise<CallToolResult> {
   try {
     return await fn();
   } catch (e) {

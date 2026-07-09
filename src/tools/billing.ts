@@ -61,8 +61,7 @@ function formatBill(bill: Bill, items: BillItem[]): string {
     if (bill.on_credit) {
       lines.push(`On credit (khata): ${bill.customer_name}`);
     } else {
-      const pay =
-        bill.payment_mode?.toUpperCase() + (bill.payment_ref ? ` (ref ${bill.payment_ref})` : "");
+      const pay = bill.payment_mode?.toUpperCase() + (bill.payment_ref ? ` (ref ${bill.payment_ref})` : "");
       lines.push(`Paid by: ${pay}`);
     }
   }
@@ -78,7 +77,10 @@ export function billingTools(ctx: ToolContext) {
       "only happens at finalize.",
     {
       product: z.string().describe("Product name or code, e.g. 'Maggi' or 'Aashirvaad Atta 5kg'"),
-      qty: z.number().positive().describe("Quantity in the product's unit (e.g. 2 for 2kg loose, 4 for 4 packets)"),
+      qty: z
+        .number()
+        .positive()
+        .describe("Quantity in the product's unit (e.g. 2 for 2kg loose, 4 for 4 packets)"),
     },
     async (a) =>
       guard(() => {
@@ -131,12 +133,9 @@ export function billingTools(ctx: ToolContext) {
     },
     async (a) =>
       guard(() => {
-        const bwi =
-          a.bill_id != null ? getBillWithItems(a.bill_id) : getOpenDraftWithItems(ctx.chatId);
+        const bwi = a.bill_id != null ? getBillWithItems(a.bill_id) : getOpenDraftWithItems(ctx.chatId);
         if (!bwi) {
-          return text(
-            a.bill_id != null ? `No bill #${a.bill_id} found.` : "No open bill right now.",
-          );
+          return text(a.bill_id != null ? `No bill #${a.bill_id} found.` : "No open bill right now.");
         }
         return text(formatBill(bwi.bill, bwi.items));
       }),
@@ -161,7 +160,9 @@ export function billingTools(ctx: ToolContext) {
       credit_customer: z
         .string()
         .optional()
-        .describe("Customer name if this is a credit (khata) sale — the total is added to their khata instead of taking payment. Opens a khata if they're new."),
+        .describe(
+          "Customer name if this is a credit (khata) sale — the total is added to their khata instead of taking payment. Opens a khata if they're new.",
+        ),
     },
     async (a) =>
       guard(() => {

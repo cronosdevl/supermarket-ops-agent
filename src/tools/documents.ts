@@ -34,8 +34,7 @@ export function documentTools(ctx: ToolContext) {
     },
     async (a) =>
       guard(async () => {
-        const bwi =
-          a.bill_id != null ? getBillWithItems(a.bill_id) : bwiFromLatest();
+        const bwi = a.bill_id != null ? getBillWithItems(a.bill_id) : bwiFromLatest();
         if (!bwi) {
           throw new StoreError(
             a.bill_id != null ? `No bill #${a.bill_id} found.` : "No finalized bill yet to invoice.",
@@ -47,9 +46,7 @@ export function documentTools(ctx: ToolContext) {
         const buffer = await renderInvoicePdf({ bill: bwi.bill, items: bwi.items, shop: getShopConfig() });
         const filename = `Invoice-${bwi.bill.id}.pdf`;
         saveArtifact(ctx, filename, buffer, `Invoice #${bwi.bill.id}`);
-        return text(
-          `🧾 Invoice #${bwi.bill.id} ready — ${formatINR(bwi.bill.total)}. Sending it as a PDF.`,
-        );
+        return text(`🧾 Invoice #${bwi.bill.id} ready — ${formatINR(bwi.bill.total)}. Sending it as a PDF.`);
       }),
   );
 

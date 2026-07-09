@@ -198,8 +198,7 @@ export const cancelDraft = db.transaction((chatId: number): { id: number } => {
 
 /** How a finalized bill is settled: paid now (cash/upi/card) or put on khata. */
 export type Settlement =
-  | { type: "paid"; mode: PaymentMode; ref?: string }
-  | { type: "credit"; customer: string };
+  { type: "paid"; mode: PaymentMode; ref?: string } | { type: "credit"; customer: string };
 
 export interface FinalizeInput {
   chatId: number;

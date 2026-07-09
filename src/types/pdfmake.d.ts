@@ -16,9 +16,6 @@ declare module "pdfmake" {
 }
 
 declare module "pdfmake/fonts/Roboto.js" {
-  const fonts: Record<
-    string,
-    { normal: string; bold: string; italics: string; bolditalics: string }
-  >;
+  const fonts: Record<string, { normal: string; bold: string; italics: string; bolditalics: string }>;
   export default fonts;
 }

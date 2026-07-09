@@ -52,7 +52,10 @@ export function createBot(): Bot {
       const { text: reply, files } = await respondToMessage(chatId, prompt);
       if (reply) await ctx.reply(reply);
       for (const f of files) {
-        await ctx.replyWithDocument(new InputFile(f.path, f.filename), f.caption ? { caption: f.caption } : {});
+        await ctx.replyWithDocument(
+          new InputFile(f.path, f.filename),
+          f.caption ? { caption: f.caption } : {},
+        );
       }
     } catch (err) {
       console.error("handlePrompt failed:", err);

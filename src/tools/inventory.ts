@@ -33,10 +33,7 @@ const getStock = tool(
     "never guess a product, price, or quantity. If a keyword matches more than " +
     "one product, ask the owner which one they mean.",
   {
-    query: z
-      .string()
-      .optional()
-      .describe("Product name or keyword to search for. Omit to list everything."),
+    query: z.string().optional().describe("Product name or keyword to search for. Omit to list everything."),
   },
   async ({ query }) =>
     guard(() => {
@@ -70,9 +67,7 @@ const addProduct = tool(
     name: z.string().describe("Full product name, e.g. 'Amul Butter 100g'"),
     unit: z.enum(ALLOWED_UNITS).describe("Selling unit"),
     mrp: z.number().positive().describe("Sell price per unit in ₹ (MRP)"),
-    gst_rate: z
-      .number()
-      .describe("GST slab as a percent: 0, 5, 12, 18 or 28"),
+    gst_rate: z.number().describe("GST slab as a percent: 0, 5, 12, 18 or 28"),
     cost_price: z.number().optional().describe("Purchase cost per unit in ₹, if known"),
     hsn: z.string().optional().describe("HSN tax code, if known"),
     is_loose: z.boolean().optional().describe("True if sold loose by weight/volume"),
@@ -183,10 +178,7 @@ const reorderSuggestions = tool(
       .number()
       .optional()
       .describe("Days of sales history to measure velocity over (default 14)"),
-    cover_days: z
-      .number()
-      .optional()
-      .describe("How many days of stock a restock should cover (default 14)"),
+    cover_days: z.number().optional().describe("How many days of stock a restock should cover (default 14)"),
   },
   async (a) =>
     guard(() => {
@@ -209,7 +201,9 @@ const reorderSuggestions = tool(
         .sort((x, y) => x.sortKey - y.sortKey);
 
       if (flagged.length === 0) {
-        return text(`Nothing needs reordering — stock is healthy at current sales rates (last ${windowDays} days).`);
+        return text(
+          `Nothing needs reordering — stock is healthy at current sales rates (last ${windowDays} days).`,
+        );
       }
 
       const lines = [`Reorder suggestions (sales velocity over last ${windowDays} days):`];
@@ -218,7 +212,9 @@ const reorderSuggestions = tool(
           const cover = r.daysOfCover === null ? "" : `~${r.daysOfCover.toFixed(1)} days left`;
           lines.push(
             `• ${r.name} — ${r.qty} ${r.unit} left, selling ~${r.dailyVelocity.toFixed(1)}/day (${cover}).` +
-              (r.suggested > 0 ? ` Suggest ordering ~${r.suggested} ${r.unit} (${coverDays}-day cover).` : ""),
+              (r.suggested > 0
+                ? ` Suggest ordering ~${r.suggested} ${r.unit} (${coverDays}-day cover).`
+                : ""),
           );
         } else {
           lines.push(

@@ -32,7 +32,7 @@ Then in Telegram open **@SupermarketOpsAgentBot** and send `/start`.
 
 ## B · Ambiguity → the model asks (not a hardcoded branch)
 
-- [ ] `how much atta do I have?` → lists **both** Aashirvaad 5kg *and* Loose Atta and asks which one
+- [ ] `how much atta do I have?` → lists **both** Aashirvaad 5kg _and_ Loose Atta and asks which one
 
 ## C · Inventory (Phase 2)
 

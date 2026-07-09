@@ -1,0 +1,8 @@
+dist
+node_modules
+artifacts
+data
+coverage
+package-lock.json
+*.pdf
+*.pptx

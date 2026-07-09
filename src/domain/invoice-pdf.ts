@@ -138,7 +138,13 @@ export async function renderInvoicePdf({ bill, items, shop }: InvoiceData): Prom
                 margin: [8, 12, 12, 12],
                 stack: [
                   { text: "TAX INVOICE", color: "#FFFFFF", bold: true, fontSize: 15, alignment: "right" },
-                  { text: `Invoice #${bill.id}`, color: "#FFFFFF", fontSize: 9, alignment: "right", margin: [0, 4, 0, 0] },
+                  {
+                    text: `Invoice #${bill.id}`,
+                    color: "#FFFFFF",
+                    fontSize: 9,
+                    alignment: "right",
+                    margin: [0, 4, 0, 0],
+                  },
                   { text: invoiceDate, color: ACCENT_TINT, fontSize: 9, alignment: "right" },
                 ],
               },

@@ -12,9 +12,7 @@ export function buildOwnerContext(): string {
   const prefs = getVisiblePreferences();
 
   const lines = ["## What the store already knows (durable — applies across chats)"];
-  lines.push(
-    `Shop: ${shop.name}${shop.gstin ? `, GSTIN ${shop.gstin}` : ""} — this appears on invoices.`,
-  );
+  lines.push(`Shop: ${shop.name}${shop.gstin ? `, GSTIN ${shop.gstin}` : ""} — this appears on invoices.`);
 
   if (prefs.length > 0) {
     lines.push("Standing preferences — honour these by default unless the owner overrides them right now:");

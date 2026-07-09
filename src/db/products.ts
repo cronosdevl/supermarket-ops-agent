@@ -119,7 +119,7 @@ export const createProduct = db.transaction((input: CreateProductInput): Product
     throw new StoreError("MRP is below cost — that would sell at a loss. Set MRP at or above cost.");
   }
 
-  const sku = (input.sku?.trim() || slugify(name)) || slugify(name);
+  const sku = input.sku?.trim() || slugify(name) || slugify(name);
   if (!sku) throw new StoreError("Could not derive a product code from that name.");
   if (getProductBySku(sku)) {
     throw new StoreError(`A product with code "${sku}" already exists. Use receive stock to add more.`);

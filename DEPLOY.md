@@ -1,7 +1,7 @@
 # Deployment
 
 The bot is a single always-on Node process. It uses **long-polling** (only
-*outbound* internet — no public URL or open port), stores data in **SQLite**, and
+_outbound_ internet — no public URL or open port), stores data in **SQLite**, and
 runs **cron jobs** (khata reminders, weekly deck), so it needs to stay running
 with a **persistent data directory**. The catalogue **auto-seeds on first boot**,
 so a fresh deploy comes up stocked with nothing to run manually.
@@ -66,6 +66,7 @@ pm2 logs supermarket-ops-agent
 ```
 
 **Start on boot:**
+
 - **Linux:** `pm2 startup` then run the command it prints.
 - **Windows:** `npm i -g pm2-windows-startup && pm2-startup install` (or run
   `node dist/index.js` as a service via [NSSM](https://nssm.cc) / Task Scheduler).

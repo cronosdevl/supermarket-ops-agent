@@ -25,7 +25,9 @@ export function khataTools() {
     async (a) =>
       guard(() => {
         const { customer, balance } = charge(a.customer, rupeesToPaise(a.amount), { note: a.note });
-        return text(`Added ${formatINR(rupeesToPaise(a.amount))} to ${customer.name}'s khata. ${balanceLine(customer.name, balance)}`);
+        return text(
+          `Added ${formatINR(rupeesToPaise(a.amount))} to ${customer.name}'s khata. ${balanceLine(customer.name, balance)}`,
+        );
       }),
   );
 
@@ -41,14 +43,15 @@ export function khataTools() {
     async (a) =>
       guard(() => {
         const { customer, balance } = payment(a.customer, rupeesToPaise(a.amount), a.note);
-        return text(`Recorded ${formatINR(rupeesToPaise(a.amount))} from ${customer.name}. ${balanceLine(customer.name, balance)}`);
+        return text(
+          `Recorded ${formatINR(rupeesToPaise(a.amount))} from ${customer.name}. ${balanceLine(customer.name, balance)}`,
+        );
       }),
   );
 
   const khataBalance = tool(
     "khata_balance",
-    "Check a customer's khata balance — \"Ramesh's balance?\". Refuses if they have " +
-      "no khata account.",
+    "Check a customer's khata balance — \"Ramesh's balance?\". Refuses if they have " + "no khata account.",
     {
       customer: z.string().describe("Customer name"),
     },
@@ -61,8 +64,7 @@ export function khataTools() {
 
   const khataOutstanding = tool(
     "khata_outstanding",
-    "List everyone with an open khata balance — 'who owes me?' / 'total udhaar?'. " +
-      "Takes no input.",
+    "List everyone with an open khata balance — 'who owes me?' / 'total udhaar?'. " + "Takes no input.",
     {},
     async () =>
       guard(() => {

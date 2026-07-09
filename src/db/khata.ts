@@ -64,7 +64,7 @@ function getOrCreateCustomer(name: string): Customer {
   if (!trimmed) throw new StoreError("A customer name is needed for khata.");
   const existing = getCustomerByName(trimmed);
   if (existing) return existing;
-  const res = insertCustomerStmt.run({ name: trimmed, name_key: normalizeName(trimmed) });
+  insertCustomerStmt.run({ name: trimmed, name_key: normalizeName(trimmed) });
   return byNameKeyStmt.get(normalizeName(trimmed)) as Customer;
 }
 
@@ -97,7 +97,9 @@ export function paymentRaw(name: string, amountPaise: number, note?: string): Le
   if (amountPaise <= 0) throw new StoreError("Payment amount must be greater than ₹0.");
   const customer = getCustomerByName(name);
   if (!customer) {
-    throw new StoreError(`No khata for "${name.trim()}" — nothing to settle. Open one with a credit charge first.`);
+    throw new StoreError(
+      `No khata for "${name.trim()}" — nothing to settle. Open one with a credit charge first.`,
+    );
   }
   insertLedgerStmt.run({
     customer_id: customer.id,
