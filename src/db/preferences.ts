@@ -40,6 +40,12 @@ export function getAllPreferences(): Preference[] {
   return allStmt.all() as Preference[];
 }
 
+/** Owner-facing preferences only — keys starting with "_" are internal app
+ *  state (e.g. the owner's chat id) and are hidden from the model. */
+export function getVisiblePreferences(): Preference[] {
+  return getAllPreferences().filter((p) => !p.key.startsWith("_"));
+}
+
 export function deletePreference(key: string): boolean {
   return deleteStmt.run(normalizeKey(key)).changes > 0;
 }

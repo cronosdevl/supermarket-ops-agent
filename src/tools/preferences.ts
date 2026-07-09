@@ -1,6 +1,6 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { deletePreference, getAllPreferences, setPreference } from "../db/preferences.js";
+import { deletePreference, getVisiblePreferences, setPreference } from "../db/preferences.js";
 import { StoreError } from "../util/errors.js";
 import { guard, text } from "./_shared.js";
 
@@ -34,7 +34,7 @@ export function preferencesTools() {
     {},
     async () =>
       guard(() => {
-        const prefs = getAllPreferences();
+        const prefs = getVisiblePreferences();
         if (prefs.length === 0) return text("No standing preferences set yet.");
         return text(["Standing preferences:", ...prefs.map((p) => `• ${p.key} = ${p.value}`)].join("\n"));
       }),

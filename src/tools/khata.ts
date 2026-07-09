@@ -1,7 +1,7 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { formatINR, rupeesToPaise } from "../db/index.js";
-import { balanceOf, charge, listOutstanding, payment } from "../db/khata.js";
+import { balanceOf, charge, listOutstanding, listOutstandingWithAge, payment } from "../db/khata.js";
 import { guard, text } from "./_shared.js";
 
 /** Human-readable balance line. Positive = owes shop; negative = advance. */
@@ -85,5 +85,26 @@ export function khataTools() {
       }),
   );
 
-  return [khataCharge, khataPayment, khataBalance, khataOutstanding];
+  const khataReminders = tool(
+    "khata_reminders",
+    "List customers with outstanding khata and how long since their last activity, " +
+      "so the owner can follow up — 'who should I remind?', 'pending udhaar?'. Use this " +
+      "when the owner wants to chase payments; you can then draft a short, polite " +
+      "reminder message per customer in the owner's language. Takes no input.",
+    {},
+    async () =>
+      guard(() => {
+        const rows = listOutstandingWithAge();
+        if (rows.length === 0) return text("No outstanding khata — nothing to remind about.");
+        const total = rows.reduce((s, r) => s + r.balance, 0);
+        const lines = [`Outstanding khata (total ${formatINR(total)}):`];
+        for (const r of rows) {
+          const age = r.daysSince === 0 ? "today" : `${r.daysSince} day(s) ago`;
+          lines.push(`• ${r.customer.name} — ${formatINR(r.balance)} (last activity ${age})`);
+        }
+        return text(lines.join("\n"));
+      }),
+  );
+
+  return [khataCharge, khataPayment, khataBalance, khataOutstanding, khataReminders];
 }

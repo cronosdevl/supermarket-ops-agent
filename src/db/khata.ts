@@ -128,3 +128,36 @@ export function listOutstanding(): Debtor[] {
     balance: r.bal,
   }));
 }
+
+export interface AgedDebtor {
+  customer: Customer;
+  balance: number; // paise, > 0 (owes the shop)
+  lastActivity: string; // UTC datetime of the most recent ledger entry
+  daysSince: number; // whole days since last activity
+}
+
+const agedStmt = db.prepare(`
+  SELECT c.id, c.name, c.name_key, c.created_at,
+         COALESCE(SUM(l.delta), 0) AS bal,
+         MAX(l.created_at) AS last_activity
+  FROM khata_customers c JOIN khata_ledger l ON l.customer_id = c.id
+  GROUP BY c.id
+  HAVING bal > 0
+  ORDER BY bal DESC
+`);
+
+/** Customers who owe money, with how long since their last khata activity. */
+export function listOutstandingWithAge(): AgedDebtor[] {
+  const rows = agedStmt.all() as (Customer & { bal: number; last_activity: string })[];
+  const now = Date.now();
+  return rows.map((r) => {
+    // SQLite stores UTC as 'YYYY-MM-DD HH:MM:SS'; parse it as UTC explicitly.
+    const last = new Date(r.last_activity.replace(" ", "T") + "Z").getTime();
+    return {
+      customer: { id: r.id, name: r.name, name_key: r.name_key, created_at: r.created_at },
+      balance: r.bal,
+      lastActivity: r.last_activity,
+      daysSince: Math.max(0, Math.floor((now - last) / 86400000)),
+    };
+  });
+}

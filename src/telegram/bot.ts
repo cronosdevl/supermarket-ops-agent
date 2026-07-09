@@ -3,6 +3,7 @@ import { config } from "../util/config.js";
 import { db } from "../db/index.js";
 import { respondToMessage, resetSession } from "../agent/respond.js";
 import { identifyProduct, type ImageMediaType } from "../agent/vision.js";
+import { rememberOwnerChat } from "../util/owner.js";
 
 /**
  * Idempotency guard (hard-part §5). Telegram redelivers updates on network
@@ -17,11 +18,13 @@ function isFreshUpdate(updateId: number): boolean {
 export function createBot(): Bot {
   const bot = new Bot(config.telegramBotToken);
 
-  // Drop redelivered updates before any handler runs.
+  // Drop redelivered updates before any handler runs; remember the owner's chat
+  // id (for proactive scheduled messages like khata reminders / weekly deck).
   bot.use(async (ctx, next) => {
     if (ctx.update.update_id !== undefined && !isFreshUpdate(ctx.update.update_id)) {
       return; // already processed
     }
+    if (ctx.chat?.id) rememberOwnerChat(ctx.chat.id);
     await next();
   });
 

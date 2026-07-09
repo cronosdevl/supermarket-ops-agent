@@ -1,5 +1,5 @@
 import { getShopConfig } from "../db/shop.js";
-import { getAllPreferences } from "../db/preferences.js";
+import { getVisiblePreferences } from "../db/preferences.js";
 
 /**
  * The durable owner context (hard-part §9). Built fresh from the DB on every
@@ -9,7 +9,7 @@ import { getAllPreferences } from "../db/preferences.js";
  */
 export function buildOwnerContext(): string {
   const shop = getShopConfig();
-  const prefs = getAllPreferences();
+  const prefs = getVisiblePreferences();
 
   const lines = ["## What the store already knows (durable — applies across chats)"];
   lines.push(
