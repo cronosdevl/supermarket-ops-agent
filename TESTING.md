@@ -100,14 +100,25 @@ Then in Telegram open **@SupermarketOpsAgentBot** and send `/start`.
 
 ## Automated checks (developer)
 
-The domain/repo logic is covered by throwaway test scripts during development;
-the always-on check is the type checker:
+The domain and repository logic is covered by an automated **Vitest** suite
+(46 tests) that runs against isolated in-memory databases — no bot, no API key:
 
 ```bash
-npm run typecheck   # must be clean
+npm test            # 46 tests, ~1s
+npm run coverage    # + coverage report
 ```
 
-Hard-parts verified during the build (each with a temp-DB test + a live agent run):
-grounding, ambiguity clarification, oversell guard + rollback, decrement-only-on-finalize,
-idempotent finalize, concurrency (two bills can't oversell), GST correctness (inclusive
-MRP → CGST/SGST split, exact paise), khata guardrails, and real PDF/PPTX artifacts.
+Plus the always-on quality gates:
+
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # ESLint
+npm run format:check
+```
+
+Hard-parts asserted by the suite: GST correctness (inclusive MRP → CGST/SGST split,
+exact paise, per-slab breakup), oversell guard + atomic rollback, decrement-only-on-
+finalize, idempotent finalize (draft consumed), khata guardrails (derived balance,
+refuse-unknown-customer), analytics (summary, velocity), and product validation. See
+[`test/`](test/). The manual script above additionally exercises the live agent,
+Telegram wiring, and PDF/PPTX artifacts.

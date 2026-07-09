@@ -4,6 +4,7 @@ import { db } from "../db/index.js";
 import { respondToMessage, resetSession } from "../agent/respond.js";
 import { identifyProduct, type ImageMediaType } from "../agent/vision.js";
 import { rememberOwnerChat } from "../util/owner.js";
+import { toTelegramMarkdown, stripFormatting, chunkMessage } from "./format.js";
 
 /**
  * Idempotency guard (hard-part §5). Telegram redelivers updates on network
@@ -13,6 +14,39 @@ import { rememberOwnerChat } from "../util/owner.js";
 const insertUpdate = db.prepare("INSERT OR IGNORE INTO processed_updates (update_id) VALUES (?)");
 function isFreshUpdate(updateId: number): boolean {
   return insertUpdate.run(updateId).changes === 1;
+}
+
+/**
+ * Keep the Telegram "typing…" indicator visible for a long agent turn.
+ *
+ * A single sendChatAction only lasts ~5s, so for a multi-second Opus turn it
+ * flickers off. We re-broadcast it every 4s until the caller stops it. Returns
+ * a stop() that's safe to call more than once (Telegram also auto-clears the
+ * indicator the moment a real message is sent).
+ */
+function keepTyping(ctx: Context): () => void {
+  const send = () => {
+    void ctx.replyWithChatAction("typing").catch(() => {});
+  };
+  send(); // show it immediately
+  const timer = setInterval(send, 4000);
+  return () => clearInterval(timer);
+}
+
+/**
+ * Send an agent reply rendered for Telegram: convert the model's Markdown to the
+ * supported subset, split to stay under the length limit, and send with the
+ * Markdown parse mode. If Telegram rejects the entities (a stray * or _), retry
+ * that chunk as plain text so a formatting glitch never eats the message.
+ */
+async function sendReply(ctx: Context, reply: string): Promise<void> {
+  for (const chunk of chunkMessage(toTelegramMarkdown(reply))) {
+    try {
+      await ctx.reply(chunk, { parse_mode: "Markdown" });
+    } catch {
+      await ctx.reply(stripFormatting(chunk));
+    }
+  }
 }
 
 export function createBot(): Bot {
@@ -47,11 +81,13 @@ export function createBot(): Bot {
   // Run a prompt through the agent and send the reply + any generated documents.
   async function handlePrompt(ctx: Context, prompt: string): Promise<void> {
     const chatId = ctx.chat!.id;
-    await ctx.replyWithChatAction("typing").catch(() => {});
+    const stopTyping = keepTyping(ctx);
     try {
       const { text: reply, files } = await respondToMessage(chatId, prompt);
-      if (reply) await ctx.reply(reply);
+      stopTyping(); // answer is ready — let the reply clear the indicator
+      if (reply) await sendReply(ctx, reply);
       for (const f of files) {
+        await ctx.replyWithChatAction("upload_document").catch(() => {});
         await ctx.replyWithDocument(
           new InputFile(f.path, f.filename),
           f.caption ? { caption: f.caption } : {},
@@ -60,6 +96,8 @@ export function createBot(): Bot {
     } catch (err) {
       console.error("handlePrompt failed:", err);
       await ctx.reply("⚠️ Something went wrong handling that. Please try again.");
+    } finally {
+      stopTyping(); // guarantee the interval is cleared on every path
     }
   }
 
@@ -71,7 +109,7 @@ export function createBot(): Bot {
 
   // Photos: identify the product with Claude vision, then let the agent act on it.
   bot.on("message:photo", async (ctx) => {
-    await ctx.replyWithChatAction("typing").catch(() => {});
+    const stopTyping = keepTyping(ctx);
     try {
       const file = await ctx.getFile(); // largest size by default
       const url = `https://api.telegram.org/file/bot${config.telegramBotToken}/${file.file_path}`;
@@ -82,6 +120,7 @@ export function createBot(): Bot {
       const caption = ctx.message.caption?.trim();
 
       if (label.toLowerCase() === "unclear") {
+        stopTyping();
         await ctx.reply("I couldn't make out the product in that photo. Could you type the item name?");
         return;
       }
@@ -90,10 +129,13 @@ export function createBot(): Bot {
         (caption ? ` Their note with the photo: "${caption}".` : "") +
         `] Match it to the catalogue with get_stock and help accordingly — if the note asks to bill or ` +
         `receive it, do that using the matched catalogue product; otherwise report what it is and its stock.`;
+      stopTyping(); // handlePrompt runs its own typing loop for the agent turn
       await handlePrompt(ctx, prompt);
     } catch (err) {
       console.error("photo handling failed:", err);
       await ctx.reply("⚠️ I couldn't read that image. Please try again or type the item.");
+    } finally {
+      stopTyping(); // safe if already stopped
     }
   });
 
