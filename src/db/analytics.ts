@@ -126,3 +126,52 @@ const gstBySlabStmt = db.prepare(`
 export function gstBySlab(period: Period): SlabTotal[] {
   return gstBySlabStmt.all({ from: period.from, to: period.to }) as SlabTotal[];
 }
+
+// ---- sales velocity (for reorder suggestions) ------------------------------
+
+export interface VelocityRow {
+  sku: string;
+  name: string;
+  unit: string;
+  qty: number;
+  reorder_level: number;
+  soldInWindow: number;
+  windowDays: number;
+  dailyVelocity: number;
+  daysOfCover: number | null; // null when there were no recent sales
+}
+
+const velocityStmt = db.prepare(`
+  SELECT p.sku, p.name, p.unit, p.qty, p.reorder_level,
+         COALESCE(s.sold, 0) AS soldInWindow
+  FROM products p
+  LEFT JOIN (
+    SELECT bi.sku AS sku, SUM(bi.qty) AS sold
+    FROM bill_items bi JOIN bills b ON b.id = bi.bill_id
+    WHERE b.status = 'final' AND b.finalized_at >= @from
+    GROUP BY bi.sku
+  ) s ON s.sku = p.sku
+  ORDER BY p.name
+`);
+
+/** Per-SKU sales rate over the last `windowDays`, with days-of-cover at that rate. */
+export function salesVelocity(windowDays: number): VelocityRow[] {
+  const from = sqliteUtc(new Date(Date.now() - windowDays * 24 * 3600 * 1000));
+  const rows = velocityStmt.all({ from }) as Array<{
+    sku: string;
+    name: string;
+    unit: string;
+    qty: number;
+    reorder_level: number;
+    soldInWindow: number;
+  }>;
+  return rows.map((r) => {
+    const dailyVelocity = r.soldInWindow / windowDays;
+    return {
+      ...r,
+      windowDays,
+      dailyVelocity,
+      daysOfCover: dailyVelocity > 0 ? r.qty / dailyVelocity : null,
+    };
+  });
+}

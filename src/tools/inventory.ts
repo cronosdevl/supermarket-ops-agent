@@ -10,6 +10,7 @@ import {
   searchProducts,
   type Product,
 } from "../db/products.js";
+import { salesVelocity } from "../db/analytics.js";
 import { guard, text } from "./_shared.js";
 
 function describeProduct(p: Product): string {
@@ -168,7 +169,69 @@ const listLowStockTool = tool(
     }),
 );
 
+// ---- reorder_suggestions (sales-velocity based) ----------------------------
+
+const reorderSuggestions = tool(
+  "reorder_suggestions",
+  "Suggest what to reorder based on how fast items are actually selling (sales " +
+    "velocity), not just the fixed reorder level — 'what should I restock?'. For each " +
+    "at-risk item it estimates the daily sales rate, how many days of stock are left, " +
+    "and a suggested order quantity. Prefer this over list_low_stock when the owner " +
+    "asks what/how much to reorder.",
+  {
+    window_days: z
+      .number()
+      .optional()
+      .describe("Days of sales history to measure velocity over (default 14)"),
+    cover_days: z
+      .number()
+      .optional()
+      .describe("How many days of stock a restock should cover (default 14)"),
+  },
+  async (a) =>
+    guard(() => {
+      const windowDays = a.window_days && a.window_days > 0 ? a.window_days : 14;
+      const coverDays = a.cover_days && a.cover_days > 0 ? a.cover_days : 14;
+      const rows = salesVelocity(windowDays);
+
+      const flagged = rows
+        .map((r) => {
+          const belowReorder = r.qty <= r.reorder_level;
+          const runningOut = r.daysOfCover !== null && r.daysOfCover <= coverDays;
+          if (!belowReorder && !runningOut) return null;
+          const suggested =
+            r.dailyVelocity > 0
+              ? Math.max(Math.ceil(r.dailyVelocity * coverDays) - r.qty, 0)
+              : Math.max(Math.ceil(r.reorder_level - r.qty), 0);
+          return { ...r, suggested, sortKey: r.daysOfCover ?? Number.POSITIVE_INFINITY };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .sort((x, y) => x.sortKey - y.sortKey);
+
+      if (flagged.length === 0) {
+        return text(`Nothing needs reordering — stock is healthy at current sales rates (last ${windowDays} days).`);
+      }
+
+      const lines = [`Reorder suggestions (sales velocity over last ${windowDays} days):`];
+      for (const r of flagged) {
+        if (r.dailyVelocity > 0) {
+          const cover = r.daysOfCover === null ? "" : `~${r.daysOfCover.toFixed(1)} days left`;
+          lines.push(
+            `• ${r.name} — ${r.qty} ${r.unit} left, selling ~${r.dailyVelocity.toFixed(1)}/day (${cover}).` +
+              (r.suggested > 0 ? ` Suggest ordering ~${r.suggested} ${r.unit} (${coverDays}-day cover).` : ""),
+          );
+        } else {
+          lines.push(
+            `• ${r.name} — ${r.qty} ${r.unit} left (at/below reorder ${r.reorder_level}), no recent sales.` +
+              (r.suggested > 0 ? ` Suggest ~${r.suggested} ${r.unit} to restock.` : ""),
+          );
+        }
+      }
+      return text(lines.join("\n"));
+    }),
+);
+
 /** Inventory tools are store-global (no per-chat context needed). */
 export function inventoryTools() {
-  return [getStock, addProduct, receiveStockTool, listLowStockTool];
+  return [getStock, addProduct, receiveStockTool, listLowStockTool, reorderSuggestions];
 }
