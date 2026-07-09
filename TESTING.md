@@ -76,19 +76,25 @@ Then in Telegram open **@SupermarketOpsAgentBot** and send `/start`.
 - [ ] `send bill #1 as a PDF` → invoice for that specific bill
 - [ ] `make this week's sales analysis deck` → **PPTX** with real charts (sales, top items, GST, payment mix, stock/credit health)
 
-## I · Session behaviour
+## I · Daily close (Phase 6)
 
-- [ ] `/new` → "fresh chat" (clears conversation; stock / khata / shop data stays)
+- [ ] `today's sales?` → total, tax collected (CGST/SGST), cash vs UPI vs card vs credit, top items
+- [ ] `close the day` → same summary
+- [ ] `this week's numbers` → summary for the last 7 days
+
+## J · Memory across sessions (Phase 6, hard-part #9)
+
+- [ ] `always assume UPI unless I say cash` → remembered
+- [ ] `when I say atta, I mean Aashirvaad Atta 5kg` → remembered
+- [ ] `what do you remember about my preferences?` → lists both
+- [ ] `/new` → fresh chat (conversation cleared; preferences live in the DB)
+- [ ] `make a bill for 4 Maggi and 1 atta, then finalize it` → **applies both prefs**: picks Aashirvaad for "atta" without asking, and finalizes as **UPI** without asking the payment mode
+- [ ] `stop assuming UPI` → forgets that preference
+
+## K · Session behaviour
+
+- [ ] `/new` → "fresh chat" (clears conversation; stock / khata / shop / preferences data stays)
 - [ ] `how much sugar is left?` → still grounded after `/new`
-
----
-
-## Not built yet (skip — Phase 6)
-
-These are not implemented, so don't test them yet:
-
-- ❌ Persistent preferences — *"always assume UPI unless I say cash"*, *"default atta = Aashirvaad 5kg"* (must survive `/new`)
-- ❌ Daily close / *"today's sales?"* as a chat command (data exists; no dedicated tool yet — the analysis deck covers it for now)
 
 ---
 

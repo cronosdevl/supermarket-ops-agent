@@ -4,6 +4,8 @@ import { billingTools } from "./billing.js";
 import { khataTools } from "./khata.js";
 import { settingsTools } from "./settings.js";
 import { documentTools } from "./documents.js";
+import { preferencesTools } from "./preferences.js";
+import { reportsTools } from "./reports.js";
 import type { ToolContext } from "./context.js";
 
 /**
@@ -23,6 +25,8 @@ export function buildStoreServer(ctx: ToolContext) {
     ...khataTools(),
     ...settingsTools(),
     ...documentTools(ctx),
+    ...preferencesTools(),
+    ...reportsTools(),
   ];
 
   const server = createSdkMcpServer({

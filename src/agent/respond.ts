@@ -3,6 +3,7 @@ import { config } from "../util/config.js";
 import { buildStoreServer } from "../tools/store-server.js";
 import type { OutgoingFile } from "../tools/context.js";
 import { SYSTEM_PROMPT } from "./system-prompt.js";
+import { buildOwnerContext } from "./owner-context.js";
 
 /** What the agent produces for one turn: a text reply plus any generated files. */
 export interface AgentReply {
@@ -42,7 +43,9 @@ export async function respondToMessage(chatId: number, text: string): Promise<Ag
     prompt: text,
     options: {
       model: config.model,
-      systemPrompt: SYSTEM_PROMPT,
+      // Durable owner context (shop + standing preferences) is rebuilt from the
+      // DB each turn, so it applies in brand-new /new chats too (memory §9).
+      systemPrompt: `${SYSTEM_PROMPT}\n\n${buildOwnerContext()}`,
       mcpServers: { store: server },
       allowedTools: toolNames,
       permissionMode: "dontAsk",
