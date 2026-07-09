@@ -19,6 +19,22 @@ const MEASURED = new Set(["kg", "g", "litre", "ml"]);
 const qtyLabel = (qty: number, unit: string) => (MEASURED.has(unit) ? `${qty} ${unit}` : `${qty}`);
 const money = (p: number) => formatINR(p);
 
+// Brand palette (the invoice stays in Latin/English — Roboto has no Devanagari).
+const ACCENT = "#1F6F4A";
+const ACCENT_TINT = "#DDEEE6";
+const TAGLINE = "Your neighbourhood kirana store";
+
+/** Up-to-two-letter monogram from the shop name, e.g. "Sharma Kirana" → "SK". */
+function monogram(name: string): string {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+  return initials || "K";
+}
+
 export interface InvoiceData {
   bill: Bill;
   items: BillItem[];
@@ -74,40 +90,64 @@ export async function renderInvoicePdf({ bill, items, shop }: InvoiceData): Prom
     ? `On credit (khata): ${bill.customer_name ?? ""}`
     : `Paid by: ${bill.payment_mode?.toUpperCase() ?? "—"}${bill.payment_ref ? ` (ref ${bill.payment_ref})` : ""}`;
 
+  const shopName = shop.name || "My Kirana Store";
+  const details = [
+    shop.address,
+    shop.phone && `Ph: ${shop.phone}`,
+    shop.gstin && `GSTIN: ${shop.gstin}`,
+    shop.state && `State: ${shop.state}`,
+  ]
+    .filter(Boolean)
+    .join("   ·   ");
+
   const docDefinition = {
     pageSize: "A4",
     pageMargins: [40, 40, 40, 55],
     defaultStyle: { font: "Roboto", fontSize: 9 },
     styles: {
-      shopName: { fontSize: 16, bold: true },
-      title: { fontSize: 14, bold: true, alignment: "right" },
-      th: { bold: true, fillColor: "#f0f0f0", margin: [0, 2, 0, 2] },
+      // Accent-filled header cells for both the line-item and tax tables.
+      th: { bold: true, fillColor: ACCENT, color: "#FFFFFF", margin: [0, 3, 0, 3] },
       small: { fontSize: 8, color: "#555" },
     },
     content: [
+      // Branded header band: monogram tile · shop name + tagline · invoice meta
       {
-        columns: [
-          {
-            width: "*",
-            stack: [
-              { text: shop.name || "My Kirana Store", style: "shopName" },
-              ...(shop.address ? [{ text: shop.address, style: "small" }] : []),
-              ...(shop.phone ? [{ text: `Phone: ${shop.phone}`, style: "small" }] : []),
-              ...(shop.gstin ? [{ text: `GSTIN: ${shop.gstin}`, style: "small" }] : []),
-              ...(shop.state ? [{ text: `State: ${shop.state}`, style: "small" }] : []),
+        table: {
+          widths: [46, "*", "auto"],
+          body: [
+            [
+              {
+                text: monogram(shopName),
+                alignment: "center",
+                color: ACCENT,
+                bold: true,
+                fontSize: 22,
+                fillColor: "#FFFFFF",
+                margin: [0, 14, 0, 14],
+              },
+              {
+                fillColor: ACCENT,
+                margin: [12, 12, 8, 12],
+                stack: [
+                  { text: shopName, color: "#FFFFFF", bold: true, fontSize: 18 },
+                  { text: TAGLINE, color: ACCENT_TINT, italics: true, fontSize: 8, margin: [0, 3, 0, 0] },
+                ],
+              },
+              {
+                fillColor: ACCENT,
+                margin: [8, 12, 12, 12],
+                stack: [
+                  { text: "TAX INVOICE", color: "#FFFFFF", bold: true, fontSize: 15, alignment: "right" },
+                  { text: `Invoice #${bill.id}`, color: "#FFFFFF", fontSize: 9, alignment: "right", margin: [0, 4, 0, 0] },
+                  { text: invoiceDate, color: ACCENT_TINT, fontSize: 9, alignment: "right" },
+                ],
+              },
             ],
-          },
-          {
-            width: "auto",
-            stack: [
-              { text: "TAX INVOICE", style: "title" },
-              { text: `Invoice #: ${bill.id}`, alignment: "right" },
-              { text: `Date: ${invoiceDate}`, alignment: "right" },
-            ],
-          },
-        ],
+          ],
+        },
+        layout: "noBorders",
       },
-      { canvas: [{ type: "line", x1: 0, y1: 8, x2: 515, y2: 8, lineWidth: 1, lineColor: "#999" }] },
+      ...(details ? [{ text: details, style: "small", margin: [0, 6, 0, 0] }] : []),
       ...(bill.on_credit && bill.customer_name
         ? [{ text: `Bill to: ${bill.customer_name}`, margin: [0, 8, 0, 0], bold: true }]
         : []),
@@ -136,17 +176,17 @@ export async function renderInvoicePdf({ bill, items, shop }: InvoiceData): Prom
               row("CGST", money(totals.cgst)),
               row("SGST", money(totals.sgst)),
               ...(roundOff !== 0 ? [row("Round off", money(roundOff))] : []),
-              { canvas: [{ type: "line", x1: 0, y1: 2, x2: 220, y2: 2, lineWidth: 0.5, lineColor: "#999" }] },
-              row("Grand Total", money(payable), true),
+              { canvas: [{ type: "line", x1: 0, y1: 2, x2: 220, y2: 2, lineWidth: 0.5, lineColor: ACCENT }] },
+              row("Grand Total", money(payable), true, ACCENT),
             ],
           },
         ],
       },
-      { text: rupeesInWords(payable), margin: [0, 10, 0, 0], italics: true },
+      { text: rupeesInWords(payable), margin: [0, 10, 0, 0], italics: true, color: ACCENT },
       { text: settlement, margin: [0, 8, 0, 0], bold: true },
     ],
     footer: {
-      text: "Thank you! This is a computer-generated invoice.",
+      text: `${shopName} · Thank you for shopping with us! · Computer-generated invoice`,
       style: "small",
       alignment: "center",
       margin: [0, 12, 0, 0],
@@ -158,11 +198,11 @@ export async function renderInvoicePdf({ bill, items, shop }: InvoiceData): Prom
 }
 
 /** A right-aligned label/value line for the totals block. */
-function row(label: string, value: string, bold = false) {
+function row(label: string, value: string, bold = false, color?: string) {
   return {
     columns: [
-      { text: label, bold },
-      { text: value, alignment: "right", bold },
+      { text: label, bold, color },
+      { text: value, alignment: "right", bold, color },
     ],
     margin: [0, 1, 0, 1],
   };
