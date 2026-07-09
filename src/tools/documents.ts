@@ -6,18 +6,10 @@ import { config } from "../util/config.js";
 import { formatINR } from "../db/index.js";
 import { getBillWithItems, getLatestFinalBill } from "../db/bills.js";
 import { getShopConfig } from "../db/shop.js";
-import { listLowStock } from "../db/products.js";
-import { listOutstanding } from "../db/khata.js";
-import {
-  gstBySlab,
-  resolvePeriod,
-  salesByDay,
-  salesSummary,
-  topItems,
-  type PeriodKind,
-} from "../db/analytics.js";
+import type { PeriodKind } from "../db/analytics.js";
 import { renderInvoicePdf } from "../domain/invoice-pdf.js";
 import { renderAnalysisDeck } from "../domain/analysis-deck.js";
+import { buildDeckData } from "../domain/deck-data.js";
 import { StoreError } from "../util/errors.js";
 import { guard, text } from "./_shared.js";
 import type { ToolContext } from "./context.js";
@@ -75,43 +67,17 @@ export function documentTools(ctx: ToolContext) {
     async (a) =>
       guard(async () => {
         const kind: PeriodKind = a.period ?? "week";
-        const period = resolvePeriod(kind);
-        const shop = getShopConfig();
-
-        const low = listLowStock().map((p) => ({
-          name: p.name,
-          qty: p.qty,
-          unit: p.unit,
-          reorder: p.reorder_level,
-          out: p.qty <= 0,
-        }));
-        const outstanding = listOutstanding()
-          .filter((o) => o.balance > 0)
-          .map((o) => ({ name: o.customer.name, balance: o.balance }));
+        const data = buildDeckData(kind);
 
         const filename = `Sales-Analysis-${kind}.pptx`;
         const filePath = path.join(config.artifactsDir, filename);
         fs.mkdirSync(config.artifactsDir, { recursive: true });
+        await renderAnalysisDeck(data, filePath);
 
-        await renderAnalysisDeck(
-          {
-            shopName: shop.name || "My Kirana Store",
-            generatedAt: new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC",
-            period,
-            summary: salesSummary(period),
-            byDay: salesByDay(period),
-            top: topItems(period, 6),
-            slabs: gstBySlab(period),
-            lowStock: low,
-            outstanding,
-          },
-          filePath,
-        );
-
-        ctx.attachments.push({ path: filePath, filename, caption: `Sales analysis — ${period.label}` });
-        const s = salesSummary(period);
+        ctx.attachments.push({ path: filePath, filename, caption: `Sales analysis — ${data.period.label}` });
+        const s = data.summary;
         return text(
-          `📊 Sales analysis deck for ${period.label} ready — ${s.bills} bill(s), ` +
+          `📊 Sales analysis deck for ${data.period.label} ready — ${s.bills} bill(s), ` +
             `${formatINR(s.sales)} sales, ${formatINR(s.gst)} GST. Sending the PPTX.`,
         );
       }),
