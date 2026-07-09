@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { db, initDb, rupeesToPaise } from "./index.js";
 
 /**
@@ -46,12 +47,13 @@ const CATALOGUE: Seed[] = [
   { sku: "loose-sugar", name: "Loose Sugar (per kg)", unit: "kg", is_loose: 1, cost: 40, mrp: 45, gst: 5, hsn: "1701", qty: 50, reorder: 10 },
 ];
 
-function seed(reset: boolean): void {
+/** Seed the catalogue. `reset` wipes products first; otherwise missing SKUs are
+ *  inserted and existing stock is left untouched. Returns the number inserted. */
+export function seedCatalogue(reset = false): number {
   initDb();
 
   if (reset) {
     db.prepare("DELETE FROM products").run();
-    console.log("↺ products table cleared");
   }
 
   const insert = db.prepare(`
@@ -81,9 +83,25 @@ function seed(reset: boolean): void {
     return added;
   });
 
-  const added = run(CATALOGUE);
+  return run(CATALOGUE);
+}
+
+/** Seed the catalogue only if it's empty — used on boot so a fresh deploy comes
+ *  up with a stocked store. Returns true if seeding happened. */
+export function seedIfEmpty(): boolean {
+  initDb();
+  const { c } = db.prepare("SELECT COUNT(*) c FROM products").get() as { c: number };
+  if (c > 0) return false;
+  seedCatalogue(false);
+  return true;
+}
+
+// CLI entry: `npm run seed` / `npm run seed -- --reset`
+const isMain = import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
+if (isMain) {
+  const reset = process.argv.includes("--reset");
+  if (reset) console.log("↺ products table cleared");
+  const added = seedCatalogue(reset);
   const total = db.prepare("SELECT COUNT(*) c FROM products").get() as { c: number };
   console.log(`✓ seed complete: ${added} new SKU(s) inserted, ${total.c} total in catalogue`);
 }
-
-seed(process.argv.includes("--reset"));

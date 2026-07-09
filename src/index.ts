@@ -1,10 +1,13 @@
 import { config } from "./util/config.js";
 import { initDb } from "./db/index.js";
+import { seedIfEmpty } from "./db/seed.js";
 import { createBot } from "./telegram/bot.js";
 import { startSchedulers } from "./scheduler.js";
 
 async function main(): Promise<void> {
   initDb();
+  // Fresh deploy? Come up with a stocked catalogue automatically.
+  if (seedIfEmpty()) console.log("✓ Seeded catalogue (empty database)");
   const bot = createBot();
 
   // Fail fast with a clear message if the token is wrong.

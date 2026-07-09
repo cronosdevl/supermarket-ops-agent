@@ -1,0 +1,14 @@
+node_modules
+dist
+data
+artifacts
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.log
+.claude-sessions
+README.md
+DEPLOY.md
+TESTING.md

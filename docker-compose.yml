@@ -1,0 +1,25 @@
+# One-command, portable deployment. Works identically on Windows (Docker Desktop)
+# and any Linux VPS:
+#
+#   docker compose up -d --build
+#
+# Secrets come from .env (ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN). The SQLite
+# database is kept on a named volume, so stock / khata / preferences survive
+# restarts and redeploys. To move to another host, copy the repo + .env and run
+# the same command (optionally migrate the `store-data` volume to keep data).
+
+services:
+  bot:
+    build: .
+    image: supermarket-ops-agent
+    container_name: supermarket-ops-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DB_PATH=/data/store.db
+      - TZ=Asia/Kolkata
+    volumes:
+      - store-data:/data
+
+volumes:
+  store-data:
