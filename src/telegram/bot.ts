@@ -1,7 +1,8 @@
-import { Bot, InputFile } from "grammy";
+import { Bot, InputFile, type Context } from "grammy";
 import { config } from "../util/config.js";
 import { db } from "../db/index.js";
 import { respondToMessage, resetSession } from "../agent/respond.js";
+import { identifyProduct, type ImageMediaType } from "../agent/vision.js";
 
 /**
  * Idempotency guard (hard-part §5). Telegram redelivers updates on network
@@ -40,23 +41,53 @@ export function createBot(): Bot {
     return ctx.reply("🧹 Started a fresh chat. Your store data and preferences are unchanged.");
   });
 
-  // Every plain-text message goes to the agent.
-  bot.on("message:text", async (ctx) => {
-    const chatId = ctx.chat.id;
-    const text = ctx.message.text;
-    if (text.startsWith("/")) return; // unhandled slash command
-
+  // Run a prompt through the agent and send the reply + any generated documents.
+  async function handlePrompt(ctx: Context, prompt: string): Promise<void> {
+    const chatId = ctx.chat!.id;
     await ctx.replyWithChatAction("typing").catch(() => {});
     try {
-      const { text: reply, files } = await respondToMessage(chatId, text);
+      const { text: reply, files } = await respondToMessage(chatId, prompt);
       if (reply) await ctx.reply(reply);
-      // Send any generated artifacts (PDF invoice, PPTX deck) as documents.
       for (const f of files) {
         await ctx.replyWithDocument(new InputFile(f.path, f.filename), f.caption ? { caption: f.caption } : {});
       }
     } catch (err) {
-      console.error("respondToMessage failed:", err);
+      console.error("handlePrompt failed:", err);
       await ctx.reply("⚠️ Something went wrong handling that. Please try again.");
+    }
+  }
+
+  // Plain-text messages go straight to the agent.
+  bot.on("message:text", async (ctx) => {
+    if (ctx.message.text.startsWith("/")) return; // unhandled slash command
+    await handlePrompt(ctx, ctx.message.text);
+  });
+
+  // Photos: identify the product with Claude vision, then let the agent act on it.
+  bot.on("message:photo", async (ctx) => {
+    await ctx.replyWithChatAction("typing").catch(() => {});
+    try {
+      const file = await ctx.getFile(); // largest size by default
+      const url = `https://api.telegram.org/file/bot${config.telegramBotToken}/${file.file_path}`;
+      const bytes = Buffer.from(await (await fetch(url)).arrayBuffer());
+      const mediaType: ImageMediaType = file.file_path?.endsWith(".png") ? "image/png" : "image/jpeg";
+
+      const label = await identifyProduct(bytes.toString("base64"), mediaType);
+      const caption = ctx.message.caption?.trim();
+
+      if (label.toLowerCase() === "unclear") {
+        await ctx.reply("I couldn't make out the product in that photo. Could you type the item name?");
+        return;
+      }
+      const prompt =
+        `[The owner sent a photo of a product. Vision identifies it as: "${label}".` +
+        (caption ? ` Their note with the photo: "${caption}".` : "") +
+        `] Match it to the catalogue with get_stock and help accordingly — if the note asks to bill or ` +
+        `receive it, do that using the matched catalogue product; otherwise report what it is and its stock.`;
+      await handlePrompt(ctx, prompt);
+    } catch (err) {
+      console.error("photo handling failed:", err);
+      await ctx.reply("⚠️ I couldn't read that image. Please try again or type the item.");
     }
   });
 
